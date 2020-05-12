@@ -67,6 +67,12 @@ public class LicenseCheckPlugin implements Plugin
                 .description("Activate license check")
                 .type(PropertyType.BOOLEAN)
                 .defaultValue("true")
+                .build(),
+            PropertyDefinition.builder(LicenseCheckPropertyKeys.PYENV_PATH)
+                .category("License Check")
+                .name("Pyenv path")
+                .description("Pyenv path")
+                .type(PropertyType.TEXT)
                 .build());
     }
 
