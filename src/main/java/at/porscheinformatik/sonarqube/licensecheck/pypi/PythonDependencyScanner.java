@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -27,6 +28,10 @@ public class PythonDependencyScanner implements Scanner
     @Override
     public List<Dependency> scan(File venvRoot)
     {
+        if (pythonEnvironmentPath == null) {
+            LOGGER.info("Python environment is not specified. Not scanning!");
+            return Collections.emptyList();
+        }
         LOGGER.info("Scanning for environment in " + pythonEnvironmentPath);
         File[] packageDirectories = new File(pythonEnvironmentPath).listFiles    (
             (file, s) -> s.endsWith(".dist-info") && file.isDirectory());
