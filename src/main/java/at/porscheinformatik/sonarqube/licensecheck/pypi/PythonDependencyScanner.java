@@ -72,7 +72,17 @@ public class PythonDependencyScanner implements Scanner
             license = getValueIfPresent(nextLine, "License:", license);
         }
         fileScanner.close();
-        return new Dependency(name, version, license);
+        if (name == null)
+        {
+            LOGGER.warn("No license information for " + metadataFile.getAbsolutePath());
+            return null;
+        }
+        return new Dependency(name, cleanNull(version), cleanNull(license));
+    }
+
+    private static String cleanNull(String value)
+    {
+        return value == null ? " " : value;
     }
 
     private String getValueIfPresent(String line, String prefix, String oldValue)
