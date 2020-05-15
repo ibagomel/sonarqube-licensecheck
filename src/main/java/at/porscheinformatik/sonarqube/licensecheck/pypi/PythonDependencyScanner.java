@@ -7,17 +7,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class PythonDependencyScanner implements Scanner
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PythonDependencyScanner.class);
 
-    private String pythonEnvironmentPath;
+    private final String pythonEnvironmentPath;
 
     public PythonDependencyScanner(String pythonEnvironmentPath)
     {
@@ -34,7 +31,7 @@ public class PythonDependencyScanner implements Scanner
         }
         LOGGER.info("Scanning for environment in " + pythonEnvironmentPath);
         File[] packageDirectories = new File(pythonEnvironmentPath).listFiles    (
-            (file, s) -> s.endsWith(".dist-info") && file.isDirectory());
+            (file, s) -> (s.endsWith(".dist-info") || s.endsWith(".egg-info")) && file.isDirectory());
         return Arrays.stream(packageDirectories)
             .map(File::getAbsoluteFile)
             .map(this::processPackageDirectory)
@@ -44,14 +41,25 @@ public class PythonDependencyScanner implements Scanner
 
     private Dependency processPackageDirectory(File directory)
     {
-        File metadataFile = new File(directory, "METADATA");
+        File metadataFiles[] = new File[]
+            {
+            new File(directory, "METADATA"),
+            new File(directory, "PKG-INFO"),
+        };
+        return Arrays.stream(metadataFiles)
+                .map(this::processMetadataFile)
+                .filter(Objects::nonNull)
+                .findFirst().orElseGet(() -> null);
+    }
+
+    private Dependency processMetadataFile(File metadataFile)
+    {
         LOGGER.info("Processing metadata file " + metadataFile.getAbsolutePath());
         if (!metadataFile.exists() || !metadataFile.isFile()) {
             LOGGER.info("No metadata file!");
             return null;
         }
-        try
-        {
+        try {
             return metadataToDependency(metadataFile);
         } catch (IOException ignore) {
             LOGGER.info("Exception, while reading metadata");
@@ -63,21 +71,33 @@ public class PythonDependencyScanner implements Scanner
     {
         String name = null;
         String version = null;
-        String license = null;
+        String metadataLicense = null;
+        Set<String> classifierLicenses = new TreeSet<>(String::compareToIgnoreCase);
         java.util.Scanner fileScanner = new java.util.Scanner(metadataFile);
         while (fileScanner.hasNextLine()) {
             String nextLine = fileScanner.nextLine();
             name = getValueIfPresent(nextLine, "Name:", name);
             version = getValueIfPresent(nextLine, "Version:", version);
-            license = getValueIfPresent(nextLine, "License:", license);
+            metadataLicense = getValueIfPresent(nextLine, "License:", metadataLicense);
+            String classifierLicense = getValueIfPresent(nextLine, "Classifier: License ::");
+            if (classifierLicense != null)
+            {
+                String preparedClassifierLicense = prepareClassifierLicense(classifierLicense);
+                if (preparedClassifierLicense != null)
+                {
+                    classifierLicenses.add(preparedClassifierLicense);
+                }
+            }
         }
         fileScanner.close();
         if (name == null)
         {
-            LOGGER.warn("No license information for " + metadataFile.getAbsolutePath());
+            LOGGER.warn("Invalid metadata file at " + metadataFile.getAbsolutePath());
             return null;
         }
-        return new Dependency(name, cleanNull(version), cleanNull(license));
+        Dependency dependency = new Dependency(name, cleanNull(version), prepareLicenses(classifierLicenses, metadataLicense));
+        LOGGER.info("Found dependency " + dependency);
+        return dependency;
     }
 
     private static String cleanNull(String value)
@@ -85,7 +105,30 @@ public class PythonDependencyScanner implements Scanner
         return value == null ? " " : value;
     }
 
-    private String getValueIfPresent(String line, String prefix, String oldValue)
+    private static String prepareLicenses(Collection<String> licenses, String metadataLicense) {
+        if (metadataLicense != null && !metadataLicense.isEmpty() && !metadataLicense.equals("UNKNOWN")) {
+            return metadataLicense;
+        }
+        return String.join(", ", licenses);
+    }
+
+    private static String prepareClassifierLicense(String license)
+    {
+        String[] licenses = license.split("::");
+        String lastLicense = licenses[licenses.length - 1].trim();
+        if ("OSI Approved".equals(lastLicense))
+        {
+            return null;
+        }
+        return lastLicense;
+    }
+
+    private static String getValueIfPresent(String line, String prefix)
+    {
+        return getValueIfPresent(line, prefix, null);
+    }
+
+    private static String getValueIfPresent(String line, String prefix, String oldValue)
     {
         if (line.startsWith(prefix))
         {
