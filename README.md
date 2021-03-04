@@ -44,6 +44,12 @@ After booting the SonarQube Server with the License-Check Plugin two new options
   * Under "Project Licenses" you can allow and disallow licenses for a specific project.
   * Under "Maven Dependencies" you can map the Maven key (groupId:artifactId) to licenses using regular expressions. E.g. `^asm:asm$` to "BSD-3-Clause"
   * Under "Maven Licenses" you can map Maven license texts to licenses using regular expressions, e.g. `.*Apache.*2.*` to "Apache-2.0".
+  
+* For every python project `licensecheck.pythonenv` should be set to appropriate python environment path.
+  * Just add to `sonar-scanner.properties` something like:
+  ```
+  licensecheck.pythonenv=${env.PYENV_HOME}/versions/python3/envs/currentProject/lib/python3.6/site-packages
+  ```
 
 ![License
 configuration](docs/licensecheck_configuration.jpg)
@@ -57,6 +63,7 @@ The plugin scans for dependencies defined in your project including all transiti
 Currently supported formats are:
 * Maven POM files - all dependencies with scope "compile" and "runtime" are checked
 * NPM package.json files - all dependencies (except "devDependencies") are checked
+* Python environment
 
 ### Project Dashboard
 

@@ -2,19 +2,20 @@ package at.porscheinformatik.sonarqube.licensecheck;
 
 import static java.util.Collections.newSetFromMap;
 
-import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import at.porscheinformatik.sonarqube.licensecheck.pypi.PythonDependencyScanner;
 import org.sonar.api.batch.bootstrap.ProjectDefinition;
 import org.sonar.api.batch.fs.FileSystem;
 import org.sonar.api.batch.fs.internal.DefaultInputModule;
 import org.sonar.api.batch.sensor.Sensor;
 import org.sonar.api.batch.sensor.SensorContext;
 import org.sonar.api.batch.sensor.SensorDescriptor;
+import org.sonar.api.config.Configuration;
 import org.sonar.api.config.Settings;
 
 import at.porscheinformatik.sonarqube.licensecheck.interfaces.Scanner;
@@ -37,15 +38,17 @@ public class LicenseCheckSensor implements Sensor
     private final static Set<Dependency> AGGREGATED_DEPENDENCIES =
         newSetFromMap(new ConcurrentHashMap<Dependency, Boolean>());
 
-    public LicenseCheckSensor(FileSystem fs, Settings settings, ValidateLicenses validateLicenses,
-        MavenLicenseService mavenLicenseService, MavenDependencyService mavenDependencyService)
+    public LicenseCheckSensor(FileSystem fs, Settings settings, Configuration configuration,
+                              ValidateLicenses validateLicenses,
+                              MavenLicenseService mavenLicenseService, MavenDependencyService mavenDependencyService)
     {
         this.fs = fs;
         this.settings = settings;
         this.validateLicenses = validateLicenses;
         this.scanners = new Scanner[]{
             new PackageJsonDependencyScanner(),
-            new MavenDependencyScanner(mavenLicenseService, mavenDependencyService)};
+            new MavenDependencyScanner(mavenLicenseService, mavenDependencyService),
+            new PythonDependencyScanner(configuration.get(LicenseCheckPropertyKeys.PYENV_PATH).orElse(null))};
     }
 
     private static void saveDependencies(SensorContext sensorContext, Set<Dependency> dependencies)
